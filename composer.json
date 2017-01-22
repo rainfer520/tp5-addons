@@ -1,9 +1,8 @@
 {
     "name": "yfcmf/tp5-addons",
     "description": "addons package for thinkphp5",
-    "homepage": "https://github.com/yfcmf/tp5-addons",
+    "homepage": "https://github.com/rainfer520/tp5-addons",
     "license": "Apache-2.0",
-    "minimum-stability": "stable",
     "version": "1.0.0",
     "authors": [
         {
