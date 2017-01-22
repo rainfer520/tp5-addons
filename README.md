@@ -44,7 +44,6 @@ use think\Addons;
 
 /**
  * 插件测试
- * @author byron sampson
  */
 class Test extends Addons	// 需继承think\addons\Addons类
 {
