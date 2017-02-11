@@ -53,7 +53,7 @@ class Test extends Addons	// 需继承think\addons\Addons类
         'title' => '插件测试',	// 插件名称
         'description' => 'thinkph5插件测试',	// 插件简介
         'status' => 0,	// 状态
-        'author' => 'byron sampson',
+        'author' => 'rainfer',
         'version' => '0.1'
     ];
 

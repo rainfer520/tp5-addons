@@ -45,7 +45,7 @@ Hook::add('action_begin', function () {
 			//动态添加行为扩展到某个标签
             Hook::add($key, $addons[$key]);
         }
-        Cache::get('hooks', $addons);
+        Cache::set('hooks', $addons);
     } else {
 		//批量导入插件
         Hook::import($data, false);
@@ -71,7 +71,7 @@ function hook($hook, $params = [])
  * @param string $class 当前类名
  * @return string
  */
-function get_addon_class($name, $type = 'controller', $class = null)
+function get_addon_class($name, $type = 'hook', $class = null)
 {
     $name = Loader::parseName($name);
     // 处理多级控制器情况
