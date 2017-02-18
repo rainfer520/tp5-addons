@@ -9,6 +9,7 @@
 namespace think\addons;
 
 use think\Request;
+use think\Hook;
 use think\Config;
 use think\Loader;
 use think\Controller;
@@ -92,5 +93,31 @@ class Base extends Controller
             }
         }
         return parent::fetch($template, $vars, $replace, $config);
+    }
+    /**
+     * 插件内方法执行
+     */
+    public function execute()
+    {
+        if ($this->addon && $this->controller && $this->action) {
+            // 获取类的命名空间
+            $class = get_addon_class($this->addon, 'controller', $this->controller);
+            if (class_exists($class)) {
+                $obj = new $class();
+                if ($obj === false) {
+                    abort(500, lang('addon init fail'));
+                }
+                // 调用操作
+                if (!method_exists($obj, $this->action)) {
+                    abort(500, lang('Controller Class Method Not Exists'));
+                }
+                // 监听addons_init
+                Hook::listen('addons_init', $this);
+                return call_user_func_array([$obj, $this->action], [Request::instance()]);
+            } else {
+                abort(500, lang('Controller Class Not Exists'));
+            }
+        }
+        abort(500, lang('addon cannot name or action'));
     }
 }

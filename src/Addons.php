@@ -11,6 +11,7 @@ namespace think;
 use think\Config;
 use think\View;
 use think\Db;
+use think\Cache;
 
 /**
  * 插件基类
@@ -70,24 +71,32 @@ abstract class Addons
         if (isset($_config[$name])) {
             return $_config[$name];
         }
-        $config = [];
-        if (is_file($this->config_file)) {
-            $temp_arr = include $this->config_file;
-            foreach ($temp_arr as $key => $value) {
-                if ($value['type'] == 'group') {
-                    foreach ($value['options'] as $gkey => $gvalue) {
-                        foreach ($gvalue['options'] as $ikey => $ivalue) {
-                            $config[$ikey] = $ivalue['value'];
-                        }
-                    }
-                } else {
-                    $config[$key] = $temp_arr[$key]['value'];
-                }
+        $config = Cache::get('addon_config_'.$name);
+        if(!$config){
+            $config = Db::name('addon')->where('name',$name)->value('config');
+            if($config){
+                $config=json_decode($config,true);
+                Cache::set('addon_config_'.$name,$config);
             }
-            unset($temp_arr);
+        }
+        if(!$config){
+            if (is_file($this->config_file)) {
+                $temp_arr = include $this->config_file;
+                foreach ($temp_arr as $key => $value) {
+                    if ($value['type'] == 'group') {
+                        foreach ($value['options'] as $gkey => $gvalue) {
+                            foreach ($gvalue['options'] as $ikey => $ivalue) {
+                                $config[$ikey] = $ivalue['value'];
+                            }
+                        }
+                    } else {
+                        $config[$key] = $temp_arr[$key]['value'];
+                    }
+                }
+                unset($temp_arr);
+            }
         }
         $_config[$name] = $config;
-
         return $config;
     }
 
@@ -107,7 +116,7 @@ abstract class Addons
      */
     final public function checkInfo()
     {
-        $info_check_keys = ['name', 'title', 'description', 'status', 'author', 'version'];
+        $info_check_keys = ['name', 'title', 'description', 'status', 'author', 'version','admin'];
         foreach ($info_check_keys as $value) {
             if (!array_key_exists($value, $this->info)) {
                 return false;

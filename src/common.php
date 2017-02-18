@@ -12,12 +12,13 @@ use think\Config;
 use think\Loader;
 use think\Cache;
 use think\Route;
+use think\Db;
 
 // 定义插件目录
 define('ADDON_PATH', ROOT_PATH . 'addons' . DS);
 
 // 定义路由
-Route::any('addons/execute/:route', "\\think\\addons\\Route@execute");
+Route::any('addons/execute/:route', "\\think\\addons\\Base@execute");
 
 // 如果插件目录不存在则创建
 if (!is_dir(ADDON_PATH)) {
@@ -29,29 +30,83 @@ Loader::addNamespace('addons', ADDON_PATH);
 
 // 闭包初始化行为
 Hook::add('action_begin', function () {
-    // 获取系统配置
-    $data = Config::get('app_debug') ? [] : Cache::get('hooks');
-	//获取所有插件
-    $addons = (array)Config::get('addons');
-    if (empty($data)) {
-        // 初始化钩子
-        foreach ($addons as $key => $values) {
-            if (is_string($values)) {
-                $values = explode(',', $values);
-            } else {
-                $values = (array)$values;
-            }
-            $addons[$key] = array_filter(array_map('get_addon_class', $values));
-			//动态添加行为扩展到某个标签
-            Hook::add($key, $addons[$key]);
+    // 插件相关数据表
+    if(!Config::get('addons_sql')){
+        install_sql();
+        sys_config_setbykey('addons_sql',true);
+    }
+    //所有有效钩子-插件
+    $hook_addons = Cache::get('hook_addons');
+    if (empty($hook_addons)) {
+        $hook_addons=Db::name('hook_addon')->alias('a')
+            ->join(Config::get('database.prefix').'hook b','a.hook =b.name')
+            ->join(Config::get('database.prefix').'addon c','a.addon =c.name')
+            ->where('a.status&b.status&c.status', 1)
+            ->column('a.addon','a.hook');
+        Cache::set('hook_addons', $hook_addons);
+    }
+    if($hook_addons){
+        foreach ($hook_addons as $key=>$value) {
+            Hook::add($key, get_addon_class($value));
         }
-        Cache::set('hooks', $addons);
-    } else {
-		//批量导入插件
-        Hook::import($data, false);
     }
 });
 
+function install_sql()
+{
+    $db=Db::connect(Config::get('database'),true);
+    //hook钩子数据表
+    if(!db_is_valid_table_name('hook')){
+        $sql="CREATE TABLE IF NOT EXISTS `".Config::get('database.prefix')."hook` (
+            `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+            `name` varchar(32) NOT NULL DEFAULT '' COMMENT '钩子名称',
+            `addon` varchar(32) NOT NULL DEFAULT '' COMMENT '钩子来自哪个插件',
+            `description` varchar(255) NOT NULL DEFAULT '' COMMENT '钩子描述',
+            `system` tinyint(4) unsigned NOT NULL DEFAULT '0' COMMENT '是否为系统钩子',
+            `create_time` int(11) unsigned NOT NULL DEFAULT '0' COMMENT '创建时间',
+            `update_time` int(11) unsigned NOT NULL DEFAULT '0' COMMENT '更新时间',
+            `status` tinyint(2) NOT NULL DEFAULT '1' COMMENT '状态',
+            PRIMARY KEY (`id`)
+            ) ENGINE=MyISAM  DEFAULT CHARSET=utf8 COMMENT='钩子表' AUTO_INCREMENT=1 ;";
+        $db->execute($sql);
+    }
+    //addon插件数据表
+    if(!db_is_valid_table_name('addon')){
+        $sql="CREATE TABLE IF NOT EXISTS `".Config::get('database.prefix')."addon` (
+            `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+            `name` varchar(32) NOT NULL DEFAULT '' COMMENT '插件名称',
+            `title` varchar(32) NOT NULL DEFAULT '' COMMENT '插件标题',
+            `icon` varchar(64) NOT NULL DEFAULT '' COMMENT '图标',
+            `description` text NOT NULL COMMENT '插件描述',
+            `author` varchar(32) NOT NULL DEFAULT '' COMMENT '作者',
+            `author_url` varchar(255) NOT NULL DEFAULT '' COMMENT '作者主页',
+            `config` text NOT NULL COMMENT '配置信息',
+            `version` varchar(16) NOT NULL DEFAULT '' COMMENT '版本号',
+            `identifier` varchar(64) NOT NULL DEFAULT '' COMMENT '插件唯一标识符',
+            `admin` tinyint(4) unsigned NOT NULL DEFAULT '0' COMMENT '是否有后台管理',
+            `create_time` int(11) unsigned NOT NULL DEFAULT '0' COMMENT '安装时间',
+            `update_time` int(11) NOT NULL DEFAULT '0' COMMENT '更新时间',
+            `sort` int(11) NOT NULL DEFAULT '100' COMMENT '排序',
+            `status` tinyint(2) NOT NULL DEFAULT '1' COMMENT '状态',
+            PRIMARY KEY (`id`)
+            ) ENGINE=MyISAM  DEFAULT CHARSET=utf8 COMMENT='插件表' AUTO_INCREMENT=1 ;";
+        $db->execute($sql);
+    }
+    //hook_addon钩子-插件数据表
+    if(!db_is_valid_table_name('hook_addon')){
+        $sql="CREATE TABLE IF NOT EXISTS `".Config::get('database.prefix')."hook_addon` (
+            `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+            `hook` varchar(32) NOT NULL DEFAULT '' COMMENT '钩子id',
+            `addon` varchar(32) NOT NULL DEFAULT '' COMMENT '插件标识',
+            `create_time` int(11) unsigned NOT NULL DEFAULT '0' COMMENT '添加时间',
+            `update_time` int(11) unsigned NOT NULL DEFAULT '0' COMMENT '更新时间',
+            `sort` int(11) unsigned NOT NULL DEFAULT '100' COMMENT '排序',
+            `status` tinyint(2) NOT NULL DEFAULT '1' COMMENT '状态',
+            PRIMARY KEY (`id`)
+            ) ENGINE=MyISAM  DEFAULT CHARSET=utf8 COMMENT='钩子-插件对应表' AUTO_INCREMENT=1 ;";
+        $db->execute($sql);
+    }
+}
 
 /**
  * 处理插件钩子
@@ -66,7 +121,7 @@ function hook($hook, $params = [])
 
 /**
  * 获取插件类的类名
- * @param $name 插件名
+ * @param string $name 插件名
  * @param string $type 返回命名空间类型
  * @param string $class 当前类名
  * @return string
