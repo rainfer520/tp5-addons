@@ -81,6 +81,7 @@ function install_sql()
             `author` varchar(32) NOT NULL DEFAULT '' COMMENT '作者',
             `author_url` varchar(255) NOT NULL DEFAULT '' COMMENT '作者主页',
             `config` text NOT NULL COMMENT '配置信息',
+			`admin_actions` text COMMENT '管理操作',
             `version` varchar(16) NOT NULL DEFAULT '' COMMENT '版本号',
             `identifier` varchar(64) NOT NULL DEFAULT '' COMMENT '插件唯一标识符',
             `admin` tinyint(4) unsigned NOT NULL DEFAULT '0' COMMENT '是否有后台管理',
